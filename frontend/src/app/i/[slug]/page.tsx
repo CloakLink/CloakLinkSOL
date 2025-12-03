@@ -1,6 +1,7 @@
 import QRCode from 'react-qr-code';
 import Link from 'next/link';
 import { fetchInvoiceBySlug } from '@/lib/api';
+import { CopyButton } from '@/components/CopyButton';
 
 type InvoicePageProps = {
   params: { slug: string };
@@ -29,10 +30,14 @@ export default async function InvoicePage({ params }: InvoicePageProps) {
           <p className="text-sm text-slate-400">Paying {invoice.profileAlias}</p>
           <h1 className="text-3xl font-semibold">{invoice.amount} {invoice.tokenSymbol}</h1>
           <p className="text-slate-300">Chain: {invoice.chain}</p>
+          {invoice.expiresAt && (
+            <p className="text-sm text-amber-300">Expires: {new Date(invoice.expiresAt).toLocaleString()}</p>
+          )}
           {invoice.description && <p className="text-slate-200">{invoice.description}</p>}
           <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4 space-y-2">
             <p className="text-sm text-slate-400">Send to receive address</p>
             <p className="break-all font-mono text-sm text-emerald-200">{invoice.receiveAddress}</p>
+            <CopyButton text={invoice.receiveAddress} label="Copy address" />
           </div>
           <div className="flex items-center gap-3">
             <span className="rounded-full bg-slate-800 px-3 py-1 text-sm capitalize">{invoice.status.toLowerCase()}</span>

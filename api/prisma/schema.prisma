@@ -12,6 +12,8 @@ model Profile {
   alias          String
   receiveAddress String
   defaultChain   String
+  avatarUrl      String?
+  description    String?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
   invoices       Invoice[]
@@ -24,9 +26,12 @@ model Invoice {
   slug           String   @unique
   amount         Decimal
   tokenSymbol    String
+  tokenAddress   String?
+  tokenDecimals  Int?
   chain          String
   receiveAddress String
   description    String?
+  expiresAt      DateTime?
   status         String   @default("UNPAID")
   txHash         String?
   createdAt      DateTime @default(now())

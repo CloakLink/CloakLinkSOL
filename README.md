@@ -48,6 +48,11 @@ CloakLink is an open-source, privacy-minded payment link generator for crypto. C
   npm run dev
   ```
 
+- **Run API + Frontend together**
+  ```bash
+  npm run dev
+  ```
+
 ## Key API routes
 - `POST /profiles` – create a profile.
 - `GET /profiles` – list profiles.

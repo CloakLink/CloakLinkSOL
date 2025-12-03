@@ -21,6 +21,8 @@ export type Profile = {
   alias: string;
   receiveAddress: string;
   defaultChain: string;
+  avatarUrl?: string | null;
+  description?: string | null;
   createdAt: string;
 };
 
@@ -30,9 +32,12 @@ export type Invoice = {
   slug: string;
   amount: string;
   tokenSymbol: string;
+  tokenAddress?: string | null;
+  tokenDecimals?: number | null;
   chain: string;
   receiveAddress: string;
   description?: string | null;
+  expiresAt?: string | null;
   status: string;
   createdAt: string;
 };
@@ -58,9 +63,12 @@ export async function fetchInvoiceBySlug(slug: string) {
     slug: string;
     amount: string;
     tokenSymbol: string;
+    tokenAddress?: string | null;
+    tokenDecimals?: number | null;
     chain: string;
     receiveAddress: string;
     description?: string | null;
+    expiresAt?: string | null;
     status: string;
     profileAlias: string;
     createdAt: string;
