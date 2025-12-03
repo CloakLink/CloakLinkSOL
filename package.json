@@ -1,0 +1,25 @@
+{
+  "name": "cloaklinksol",
+  "version": "1.0.0",
+  "description": "CloakLink monorepo for privacy-minded crypto payment links (Simple Mode MVP)",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "dev:api": "npm --workspace api run dev",
+    "dev:frontend": "npm --workspace frontend run dev",
+    "dev:indexer": "npm --workspace indexer run dev",
+    "lint:frontend": "npm --workspace frontend run lint"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "api",
+    "indexer"
+  ]
+}
