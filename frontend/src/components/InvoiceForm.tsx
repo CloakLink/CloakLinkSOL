@@ -31,6 +31,7 @@ export function InvoiceForm({ profileId, defaultChain }: InvoiceFormProps) {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof FormState, string>>>({});
 
   const handleChange = (key: keyof FormState, value: string) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -41,6 +42,25 @@ export function InvoiceForm({ profileId, defaultChain }: InvoiceFormProps) {
     setLoading(true);
     setError(null);
     setMessage(null);
+    setFieldErrors({});
+
+    const errors: Partial<Record<keyof FormState, string>> = {};
+    const amountNumber = Number(form.amount);
+    if (!form.amount || Number.isNaN(amountNumber) || amountNumber <= 0) {
+      errors.amount = 'Enter a positive amount.';
+    }
+    if (form.slug && !/^[a-z0-9-]{3,}$/.test(form.slug)) {
+      errors.slug = 'Slug must be lowercase letters, numbers, and dashes.';
+    }
+    if (!form.chain.trim()) {
+      errors.chain = 'Chain is required.';
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      setLoading(false);
+      return;
+    }
 
     try {
       const payload = {
@@ -73,6 +93,7 @@ export function InvoiceForm({ profileId, defaultChain }: InvoiceFormProps) {
           onChange={(e) => handleChange('amount', e.target.value)}
           className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-white focus:border-emerald-500 focus:outline-none"
         />
+        {fieldErrors.amount && <p className="mt-1 text-sm text-red-400">{fieldErrors.amount}</p>}
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
@@ -96,6 +117,7 @@ export function InvoiceForm({ profileId, defaultChain }: InvoiceFormProps) {
             onChange={(e) => handleChange('chain', e.target.value)}
             className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-white focus:border-emerald-500 focus:outline-none"
           />
+          {fieldErrors.chain && <p className="mt-1 text-sm text-red-400">{fieldErrors.chain}</p>}
         </div>
       </div>
       <div>
@@ -106,6 +128,8 @@ export function InvoiceForm({ profileId, defaultChain }: InvoiceFormProps) {
           placeholder="e.g. landing-page-500-usdc"
           className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-white focus:border-emerald-500 focus:outline-none"
         />
+        {fieldErrors.slug && <p className="mt-1 text-sm text-red-400">{fieldErrors.slug}</p>}
+        <p className="mt-1 text-xs text-slate-400">Preview: /i/{form.slug || `${form.tokenSymbol.toLowerCase()}-${form.amount || 'amount'}`}</p>
       </div>
       <div>
         <label className="block text-sm text-slate-300">Description (optional)</label>

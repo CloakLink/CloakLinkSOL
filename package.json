@@ -10,7 +10,12 @@
     "dev:api": "npm --workspace api run dev",
     "dev:frontend": "npm --workspace frontend run dev",
     "dev:indexer": "npm --workspace indexer run dev",
-    "lint:frontend": "npm --workspace frontend run lint"
+    "dev": "concurrently \"npm run dev:api\" \"npm run dev:frontend\"",
+    "dev:all": "concurrently \"npm run dev:api\" \"npm run dev:frontend\" \"npm run dev:indexer\"",
+    "lint:frontend": "npm --workspace frontend run lint",
+    "lint:api": "npm --workspace api run lint",
+    "lint:indexer": "npm --workspace indexer run lint",
+    "lint": "npm run lint:frontend && npm run lint:api && npm run lint:indexer"
   },
   "keywords": [],
   "author": "",
@@ -21,5 +26,8 @@
     "frontend",
     "api",
     "indexer"
-  ]
+  ],
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
 }
