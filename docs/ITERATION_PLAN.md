@@ -1,12 +1,23 @@
-# Production Hardening Iteration Plan
+# Iteration Plan
 
-- [x] 1) Persist indexer cursors in the primary database via Prisma migration and refactor indexer reads/writes to use the DB-backed cursor table.
-- [x] 2) Add resilient RPC client behavior (timeouts, retries with backoff, and health logging) around Solana polling to withstand transient RPC issues.
-- [x] 3) Enforce payment matching guards (memo/amount verification and idempotent handling) to prevent double-processing across restarts.
-- [x] 4) Introduce structured logging and environment/config validation for the indexer to fail fast on misconfiguration.
-- [x] 5) Build an indexer unit/integration test suite using Vitest with mocked Solana RPC covering SOL and SPL token payment detection.
-- [x] 6) Expand API tests for Solana invoice/profile creation and validation error paths to protect the surface area.
-- [x] 7) Create an end-to-end harness that runs API + indexer with a Prisma test DB and mocked RPC to validate invoice payment flow end-to-end.
-- [x] 8) Dockerize local dev with docker-compose for API, frontend, indexer, and a persistent SQLite volume plus seeded env templates.
-- [x] 9) Add monorepo-wide lint/test orchestration (root scripts/CI workflow) to keep workspaces consistent.
-- [x] 10) Update README/docs with Solana flow diagrams, indexer runbook, and operational guidelines for production deployment.
+## Infrastructure tasks
+- [x] Postgres migration: switch Prisma datasource to PostgreSQL schema definition and regenerate client artifacts.
+- [x] Containerize Postgres: add a Postgres service with persistent volume and healthchecks in docker-compose and wire API/indexer to it.
+- [x] Database migrations workflow: create fresh Prisma migration targeting Postgres and add npm scripts for migrate/deploy in all services.
+- [x] Environment templates: update api/indexer .env.example files and docs to default to Postgres connection strings instead of SQLite paths.
+- [x] Service startup gating: add a wait-for-DB entrypoint to API and indexer images so they block until Postgres is reachable.
+- [x] Prisma connection tuning: expose pool configuration via env vars and set sensible defaults for production.
+- [x] CI pipeline update: ensure tests/lint use Postgres in CI by starting a container, running migrations, and pointing DATABASE_URL accordingly.
+- [x] Operator runbook: document migration/backups/rollbacks for Postgres and indexer cursor resets.
+- [x] Migration/seed CLI: add npm scripts to run migrations and seed demo data with Prisma for operators.
+- [x] Data backup automation: add script or make target to dump/restore Postgres data for local/dev stacks.
+- [x] Circuit breaker: wrap Solana RPC client in a circuit breaker with configurable failure thresholds and cooldown.
+- [x] Adaptive backoff: implement exponential backoff with jitter for RPC retries in indexer runtime and API client utilities.
+- [x] RPC endpoint failover: allow configuring multiple RPC URLs and rotate through them on failure with logging.
+- [x] Metadata caching: cache token/mint metadata and account info to cut RPC load with TTL invalidation.
+- [x] Indexer health endpoint: expose HTTP health/metrics for indexer (cursor lag, RPC status, breaker state).
+- [x] Structured RPC logging: centralize RPC error logging with request/response metadata for observability.
+- [x] Circuit breaker tests: add unit tests covering breaker transitions, backoff, and endpoint rotation.
+- [x] Indexer health tests: add tests for health endpoint responses and metadata cache behavior.
+- [x] Postgres integration tests: add minimal API/indexer integration test using Postgres (via docker or testcontainer) to validate migrations.
+- [x] Compose override for prod-like deploy: add docker-compose.prod.yml that runs migrations on boot and wires services to Postgres with stricter settings.

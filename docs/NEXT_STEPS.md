@@ -4,13 +4,13 @@
 - **API**: Zod schemas validate Solana Base58 public keys via `@solana/web3.js`; default envs target Solana RPCs. Profile and invoice payloads accept Solana recipients and optional SPL mint addresses. Prisma migrations include an `IndexerCursor` table shared with the indexer runtime.
 - **Frontend**: `InvoiceForm` rejects `0x` addresses, accepts Base58 recipients, and clarifies SPL mint handling (blank = SOL). Amount/slug validation and copy helpers remain intact.
 - **Indexer**: Solana RPC poller refactored into a runtime with config validation, structured logging, memo-aware SOL/SPL detection, retry/timeouts, and per-invoice cursor persistence via Prisma (no more local files). Env template covers RPC URL, retries, memo enforcement, and logging level.
-- **Tooling & tests**: Workspace lint/test scripts cover API integrations, invoice end-to-end payment flow with mocked RPC, and indexer runtime unit tests. Prisma client generation now runs automatically before API tests to avoid CI initialization failures. Dockerfile/docker-compose provide a dev stack (API + frontend + indexer + SQLite volume). CI workflow runs lint/test.
+- **Tooling & tests**: Workspace lint/test scripts cover API integrations, invoice end-to-end payment flow with mocked RPC, and indexer runtime unit tests. Prisma client generation now runs automatically before API tests to avoid CI initialization failures. Dockerfile/docker-compose provide a dev stack (Postgres + API + frontend + indexer). CI workflow runs lint/test.
 
 ## What the next engineer should know
 - Provide a reachable Solana RPC endpoint (`INDEXER_RPC_URL` / `API_SOLANA_RPC_URL`). Mainnet-beta URLs are referenced in examples; devnet works for testing.
-- Prisma migrations must run before starting API or indexer (`npm run db:migrate` from repo root) so `IndexerCursor` is available. SQLite files live under `data/` in Docker/dev; adjust `DATABASE_URL` for Postgres in production.
+- Prisma migrations must run before starting API or indexer (`npm run db:migrate` from repo root) so `IndexerCursor` is available. Postgres is the default datastore; ensure `DATABASE_URL` points at the running container/service.
 - Indexer matching enforces memo strings when configured and checks lamport/token balance increases for the recipient. Cursor state is written via Prisma; ensure DB connectivity and permissions. RPC retry/backoff and timeouts are configurable through env.
-- Docker-compose starts the API, indexer, and frontend together for local dev. Vitest suites mock Solana RPC and will generate fresh SQLite DBs under `data/`.
+- Docker-compose starts Postgres, API, indexer, and frontend together for local dev. Vitest suites mock Solana RPC and will seed schemas into Postgres when migrations run.
 - Frontend mint field is optional; leaving it blank means SOL. Decimals are inferred from invoices (no on-chain mint lookup yet).
 
 ## Suggested next steps

@@ -1,16 +1,18 @@
 import 'dotenv/config';
-import { PrismaClient } from '@prisma/client';
-import { Connection } from '@solana/web3.js';
 import { loadConfig } from './config.js';
 import { createLogger } from './logger.js';
 import { createIndexerRuntime } from './runtime.js';
+import { RpcClient } from './rpcClient.js';
+import { createPrismaClient } from './prisma.js';
+import { startHealthServer } from './healthServer.js';
 
 const config = loadConfig();
 const logger = createLogger(config.logLevel);
-const prisma = new PrismaClient();
-const connection = new Connection(config.rpcUrl, 'confirmed');
+const prisma = createPrismaClient();
+const rpcClient = new RpcClient(config, logger);
 
-const runtime = createIndexerRuntime({ connection, prisma, config, logger });
+const runtime = createIndexerRuntime({ rpcClient, prisma, config, logger });
+const stopHealth = startHealthServer(runtime, config, logger);
 
 runtime
   .start()
@@ -21,6 +23,7 @@ runtime
   .then((stop) => {
     process.on('SIGINT', () => {
       stop?.();
+      stopHealth();
       process.exit(0);
     });
   });

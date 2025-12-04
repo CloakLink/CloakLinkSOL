@@ -3,7 +3,7 @@
 CloakLink is an open-source, privacy-minded payment link generator for crypto. Create invoices that hide your main wallet while staying non-custodial. The Simple Mode MVP routes all invoices for a profile to a dedicated receive address on Solana.
 
 ## Packages
-- `api`: Express + Prisma API with SQLite storage for profiles and invoices (Solana address validation built-in).
+- `api`: Express + Prisma API with PostgreSQL storage for profiles and invoices (Solana address validation built-in).
 - `frontend`: Next.js + Tailwind dashboard and public invoice pages.
 - `indexer`: Solana polling script using `@solana/web3.js` to mark invoices paid when SOL or SPL token transfers land at the receive address.
 
@@ -19,12 +19,11 @@ CloakLink is an open-source, privacy-minded payment link generator for crypto. C
 2. Prepare environment variables (examples are checked in):
    - API: copy `api/.env.example` to `api/.env` and adjust `DATABASE_URL`, `PORT`, and default profile fields.
    - Frontend: copy `frontend/.env.local.example` to `frontend/.env.local` and set `NEXT_PUBLIC_API_URL` (defaults to `http://localhost:4000`).
-   - Indexer: copy `indexer/.env.example` to `indexer/.env` and set `DATABASE_URL` (point to the same SQLite file) and `RPC_URL` (defaults to `https://api.mainnet-beta.solana.com`).
-3. Run database migration and generate Prisma client (the default `.env` paths expect the SQLite DB under `./data`):
+   - Indexer: copy `indexer/.env.example` to `indexer/.env` and set `DATABASE_URL` (point to the shared Postgres instance) and `RPC_URL` (defaults to `https://api.mainnet-beta.solana.com`).
+3. Run database migration and generate Prisma client (requires Postgres running locally or via Docker):
    ```bash
-   cd api
-   npx prisma migrate dev --name init
-   cd ..
+   npm run db:migrate
+   npm run db:generate
    ```
 
 ## Running services
@@ -56,7 +55,7 @@ CloakLink is an open-source, privacy-minded payment link generator for crypto. C
 ## Solana payment flow and indexer runbook
 - Invoices inherit the profile receive address and target chain (Solana) and optionally an SPL mint address.
 - The indexer polls RPC using `getSignaturesForAddress` and `getParsedTransaction`, validates memo prefixes when enabled, and checks lamport/token balance deltas to detect payments.
-- Cursor positions and invoice statuses are persisted via Prisma in the shared SQLite database under `./data`. Keep the API and indexer `DATABASE_URL` values aligned.
+- Cursor positions and invoice statuses are persisted via Prisma in the shared Postgres database. Keep the API and indexer `DATABASE_URL` values aligned.
 - Tune resilience with `POLL_INTERVAL_MS`, `RPC_MAX_RETRIES`, `RPC_RETRY_DELAY_MS`, and `RPC_TIMEOUT_MS` in `indexer/.env`.
 - For production, provision a reliable Solana RPC endpoint and monitor logs for repeated RPC failures.
 
@@ -78,11 +77,11 @@ CloakLink is an open-source, privacy-minded payment link generator for crypto. C
 - GitHub Actions workflow (`.github/workflows/ci.yml`) installs dependencies, lints, and runs tests for all workspaces.
 
 ## Dockerized local development
-Docker Compose spins up API, frontend, and indexer sharing the same SQLite volume under `./data`:
+Docker Compose spins up Postgres, API, frontend, and indexer:
 ```bash
 docker compose up --build
 ```
-Environment defaults come from `api/.env.example` and `indexer/.env.example`; override as needed for your Solana RPC and database path.
+Environment defaults come from `api/.env.example` and `indexer/.env.example`; override as needed for your Solana RPC and Postgres credentials.
 
 ## Project goals
 - Non-custodial, no mixing.

@@ -7,14 +7,21 @@ import { createIndexerRuntime } from '../src/runtime.js';
 
 const baseConfig: IndexerConfig = {
   rpcUrl: 'http://localhost:8899',
+  rpcEndpoints: ['http://localhost:8899'],
   pollIntervalMs: 10,
   rpcMaxRetries: 0,
   rpcRetryDelayMs: 10,
+  rpcBackoffMaxMs: 1000,
+  rpcBreakerThreshold: 3,
+  rpcBreakerCooldownMs: 5000,
+  rpcFailoverThreshold: 2,
+  rpcCacheTtlMs: 1000,
   rpcTimeoutMs: 1000,
   requireMemoMatch: false,
   memoPrefix: 'memo-',
   chain: 'solana',
   logLevel: 'error',
+  healthPort: 5001,
 };
 
 const receiveAddress = new PublicKey('H3UuEhEDuJeayQM2ngiZX6hgqPdh9vywgqbiZ9erjRzG').toBase58();
@@ -63,13 +70,14 @@ describe('Indexer runtime', () => {
       },
     } as any;
 
-    const connection = {
+    const rpcClient = {
       getParsedTransaction: vi.fn().mockResolvedValue(parsedTx),
       getSignaturesForAddress: vi.fn(),
-    } as unknown as Parameters<typeof createIndexerRuntime>[0]['connection'];
+      status: vi.fn().mockReturnValue({ endpoint: baseConfig.rpcUrl, state: 'closed', failureCount: 0 }),
+    } as unknown as Parameters<typeof createIndexerRuntime>[0]['rpcClient'];
 
     const runtime = createIndexerRuntime({
-      connection,
+      rpcClient,
       prisma,
       config: { ...baseConfig, requireMemoMatch: true },
       logger: createLogger('error'),
@@ -95,16 +103,17 @@ describe('Indexer runtime', () => {
       meta: { preBalances: [0], postBalances: [2_000_000_000], logMessages: [] },
     } as any;
 
-    const connection = {
+    const rpcClient = {
       getParsedTransaction: vi.fn().mockResolvedValue(parsedTx),
       getSignaturesForAddress: vi.fn().mockResolvedValue([
         { signature: 'sig-newest', slot: 1, err: null, blockTime: 1_700_000_000 },
         { signature: 'sig-old', slot: 0, err: null, blockTime: 1_699_000_000 },
       ]),
-    } as unknown as Parameters<typeof createIndexerRuntime>[0]['connection'];
+      status: vi.fn().mockReturnValue({ endpoint: baseConfig.rpcUrl, state: 'closed', failureCount: 0 }),
+    } as unknown as Parameters<typeof createIndexerRuntime>[0]['rpcClient'];
 
     const runtime = createIndexerRuntime({
-      connection,
+      rpcClient,
       prisma,
       config: baseConfig,
       logger: createLogger('error'),
@@ -156,13 +165,14 @@ describe('Indexer runtime', () => {
       },
     } as any;
 
-    const connection = {
+    const rpcClient = {
       getParsedTransaction: vi.fn().mockResolvedValue(parsedTx),
       getSignaturesForAddress: vi.fn().mockResolvedValue([{ signature: 'sig', slot: 1, err: null, blockTime: null }]),
-    } as unknown as Parameters<typeof createIndexerRuntime>[0]['connection'];
+      status: vi.fn().mockReturnValue({ endpoint: baseConfig.rpcUrl, state: 'closed', failureCount: 0 }),
+    } as unknown as Parameters<typeof createIndexerRuntime>[0]['rpcClient'];
 
     const runtime = createIndexerRuntime({
-      connection,
+      rpcClient,
       prisma,
       config: baseConfig,
       logger: createLogger('error'),

@@ -3,8 +3,6 @@ import { PrismaClient } from '@prisma/client';
 const defaultPoolLimit = process.env.DATABASE_POOL_MAX ?? '10';
 const defaultPoolTimeout = process.env.DATABASE_POOL_TIMEOUT_MS ?? '5000';
 
-export const prisma = createPrismaClient();
-
 export function createPrismaClient(): PrismaClient {
   const databaseUrl = process.env.DATABASE_URL;
 

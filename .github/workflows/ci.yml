@@ -8,6 +8,20 @@ on:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: cloaklink
+          POSTGRES_PASSWORD: cloaklink
+          POSTGRES_DB: cloaklink
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U cloaklink"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v4
       - name: Setup Node.js
@@ -16,9 +30,15 @@ jobs:
           node-version: '20'
       - name: Install dependencies
         run: npm install
+      - name: Migrate database
+        env:
+          DATABASE_URL: postgresql://cloaklink:cloaklink@localhost:5432/cloaklink?schema=public
+        run: |
+          npm run db:migrate
+          npm run db:generate
       - name: Lint
         run: npm run lint
       - name: Test
         env:
-          DATABASE_URL: "file:./data/ci.db"
+          DATABASE_URL: postgresql://cloaklink:cloaklink@localhost:5432/cloaklink?schema=public
         run: npm run test
