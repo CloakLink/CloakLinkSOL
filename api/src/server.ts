@@ -7,6 +7,7 @@ import { Prisma } from '@prisma/client';
 import { nanoid } from 'nanoid';
 import { z } from 'zod';
 import { randomUUID } from 'crypto';
+import { PublicKey } from '@solana/web3.js';
 
 const app = express();
 app.use(express.json());
@@ -33,11 +34,23 @@ app.use(morgan(':method :url :status :response-time ms - :res[content-length] :i
 
 const port = process.env.PORT ? Number(process.env.PORT) : 4000;
 
-const ethAddressRegex = /^0x[a-fA-F0-9]{40}$/;
+function isValidSolanaAddress(address: string) {
+  try {
+    return new PublicKey(address).toBase58() === address;
+  } catch (err) {
+    return false;
+  }
+}
+
+const solanaAddressSchema = z
+  .string()
+  .min(32)
+  .max(44)
+  .refine(isValidSolanaAddress, 'Invalid Solana address');
 
 const profileSchema = z.object({
   alias: z.string().min(2).max(50),
-  receiveAddress: z.string().regex(ethAddressRegex, 'Invalid Ethereum address'),
+  receiveAddress: solanaAddressSchema,
   defaultChain: z.string().min(2).max(30),
   avatarUrl: z.string().url().optional(),
   description: z.string().max(160).optional(),
@@ -53,7 +66,7 @@ const amountSchema = z
 const invoiceSchema = z.object({
   amount: amountSchema,
   tokenSymbol: z.string().regex(/^[A-Za-z0-9]{2,10}$/),
-  tokenAddress: z.string().regex(ethAddressRegex, 'Invalid token address').optional(),
+  tokenAddress: solanaAddressSchema.optional(),
   tokenDecimals: z.number().int().min(0).max(30).optional(),
   chain: z.string().min(2).max(30).optional(),
   description: z.string().max(280).optional(),
@@ -70,8 +83,9 @@ function slugify(text: string) {
 
 async function ensureDefaultProfile() {
   const alias = process.env.DEFAULT_PROFILE_ALIAS ?? 'Demo Alias';
-  const receiveAddress = process.env.DEFAULT_RECEIVE_ADDRESS ?? '0x0000000000000000000000000000000000000000';
-  const defaultChain = process.env.DEFAULT_CHAIN ?? 'ethereum';
+  const receiveAddress =
+    process.env.DEFAULT_RECEIVE_ADDRESS ?? 'H3UuEhEDuJeayQM2ngiZX6hgqPdh9vywgqbiZ9erjRzG';
+  const defaultChain = process.env.DEFAULT_CHAIN ?? 'solana';
   const existing = await prisma.profile.findFirst({ where: { alias } });
   if (!existing) {
     await prisma.profile.create({ data: { alias, receiveAddress, defaultChain } });
@@ -203,7 +217,11 @@ async function main() {
   });
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+if (process.env.NODE_ENV !== 'test') {
+  main().catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
+}
+
+export { app, ensureDefaultProfile };

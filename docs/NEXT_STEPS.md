@@ -1,16 +1,21 @@
 # Next steps for CloakLink contributors
 
-## Recent changes
-- Added environment templates for API, frontend, and indexer plus prisma setup notes in `api/README.md`.
-- Hardened API validation (addresses, decimals, slug rules) and standardized errors; extended models with optional metadata and expiry fields.
-- Introduced linting for API and indexer with flat configs and root lint script; added concurrent dev scripts.
-- Frontend improvements: client-side invoice validation, slug preview, copy-to-clipboard on invoice page, and support for new invoice fields.
+## Current state (Solana pivot)
+- **API**: Zod schemas validate Solana Base58 public keys via `@solana/web3.js`; default envs target the Solana network with example public keys. Profile and invoice payloads accept Solana recipients and optional SPL mint addresses.
+- **Frontend**: `InvoiceForm` rejects `0x` addresses, accepts Base58 recipients, and clarifies SPL mint handling (blank = SOL). Amount/slug validation and copy helpers remain intact.
+- **Indexer**: A Solana RPC poller (`@solana/web3.js`) uses `getSignaturesForAddress` and `getParsedTransaction` to detect SOL and SPL token payments, updates invoices to PAID on matches, and persists a cursor per receive address/signature. Env templates include RPC URL and polling interval.
+- **Tooling & tests**: Workspaces share lint/test scripts; API build/test pass with the Solana validation. A profile creation integration test confirms Solana addresses are accepted.
 
-## What to tackle next
-1. Implement real chain checks in the indexer (viem/ethers) to detect payments, using `tokenAddress`/`tokenDecimals` and persisting last-processed block.
-2. Add pagination and profile selection on the dashboard; support profile avatar/description in UI.
-3. Expand API with profile lookup by alias/slug and optional invoice expiry enforcement.
-4. Add API + frontend tests (Supertest/RTL) for validation and user flows.
-5. Consider Dockerfiles/Compose for API + frontend + SQLite volume; wire migrations into startup scripts.
-6. Tighten CORS/rate limits and add structured logging in API/indexer.
-7. Refresh README with payment flow diagrams and indexer expectations once RPC integration lands.
+## What the next engineer should know
+- Provide a reachable Solana RPC endpoint (`INDEXER_RPC_URL` / `API_SOLANA_RPC_URL` if added later). Mainnet-beta URLs are referenced in examples; devnet works for testing.
+- The indexer currently stores cursors in local files under `data/cursors` (per address). Ensure write permissions in the deployment environment.
+- Invoice matching checks lamport or token balance increases for the recipient; no memo/timestamp guards yet.
+- Frontend mint field is optional; leaving it blank means SOL. Decimals are inferred from invoices (no on-chain mint lookup yet).
+
+## Suggested next steps
+1. Add deeper indexer resilience: retries/backoff, RPC health logging, and alerting when cursor files fall behind.
+2. Persist cursors and invoice status updates in the primary database instead of local files; consider migrations/Prisma helpers.
+3. Enrich matching logic with memo/amount verification and prevent double processing across restarts.
+4. Expand automated tests: indexer unit/integration coverage (mocked RPC), API/Frontend e2e flows for invoice creation and payment detection.
+5. Wire dockerized local dev (API + frontend + indexer + SQLite volume) and document `npm run dev` expectations per workspace.
+6. Refresh README/architecture docs with Solana payment flow diagrams and operational runbooks for the indexer.
