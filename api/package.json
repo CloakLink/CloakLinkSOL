@@ -11,6 +11,7 @@
     "migrate": "prisma migrate dev --name init",
     "generate": "prisma generate",
     "lint": "eslint \"src/**/*.{ts,tsx}\"",
+    "pretest": "npm run generate",
     "test": "vitest run"
   },
   "keywords": [],
@@ -18,7 +19,7 @@
   "license": "ISC",
   "type": "module",
   "dependencies": {
-    "@prisma/client": "5.22.0",
+    "@prisma/client": "^5.22.0",
     "@solana/web3.js": "^1.95.2",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
