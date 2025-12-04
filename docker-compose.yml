@@ -1,0 +1,35 @@
+version: '3.9'
+services:
+  api:
+    build: .
+    command: npm run dev:api
+    env_file:
+      - api/.env.example
+    ports:
+      - '4000:4000'
+    volumes:
+      - .:/app
+      - cloaklink-data:/app/data
+  frontend:
+    build: .
+    command: npm run dev:frontend
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:4000
+    ports:
+      - '3000:3000'
+    volumes:
+      - .:/app
+    depends_on:
+      - api
+  indexer:
+    build: .
+    command: npm run dev:indexer
+    env_file:
+      - indexer/.env.example
+    depends_on:
+      - api
+    volumes:
+      - .:/app
+      - cloaklink-data:/app/data
+volumes:
+  cloaklink-data:

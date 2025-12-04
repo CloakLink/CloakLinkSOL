@@ -53,6 +53,13 @@ CloakLink is an open-source, privacy-minded payment link generator for crypto. C
   npm run dev
   ```
 
+## Solana payment flow and indexer runbook
+- Invoices inherit the profile receive address and target chain (Solana) and optionally an SPL mint address.
+- The indexer polls RPC using `getSignaturesForAddress` and `getParsedTransaction`, validates memo prefixes when enabled, and checks lamport/token balance deltas to detect payments.
+- Cursor positions and invoice statuses are persisted via Prisma in the shared SQLite database under `./data`. Keep the API and indexer `DATABASE_URL` values aligned.
+- Tune resilience with `POLL_INTERVAL_MS`, `RPC_MAX_RETRIES`, `RPC_RETRY_DELAY_MS`, and `RPC_TIMEOUT_MS` in `indexer/.env`.
+- For production, provision a reliable Solana RPC endpoint and monitor logs for repeated RPC failures.
+
 ## Key API routes
 - `POST /profiles` – create a profile.
 - `GET /profiles` – list profiles.
@@ -63,6 +70,19 @@ CloakLink is an open-source, privacy-minded payment link generator for crypto. C
 - `GET /invoices/:id/status` – invoice status by id.
 - `GET /invoices/slug/:slug` – public invoice lookup by slug.
 - `GET /invoices/slug/:slug/status` – status by slug.
+
+## Testing and CI
+- Run workspace tests: `npm run test`
+- Run linters: `npm run lint`
+- Combined check: `npm run check`
+- GitHub Actions workflow (`.github/workflows/ci.yml`) installs dependencies, lints, and runs tests for all workspaces.
+
+## Dockerized local development
+Docker Compose spins up API, frontend, and indexer sharing the same SQLite volume under `./data`:
+```bash
+docker compose up --build
+```
+Environment defaults come from `api/.env.example` and `indexer/.env.example`; override as needed for your Solana RPC and database path.
 
 ## Project goals
 - Non-custodial, no mixing.

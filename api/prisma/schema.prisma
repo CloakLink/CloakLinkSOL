@@ -37,4 +37,13 @@ model Invoice {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
   paidAt         DateTime?
+  cursor         IndexerCursor?
+}
+
+model IndexerCursor {
+  invoiceId     String   @id
+  invoice       Invoice  @relation(fields: [invoiceId], references: [id])
+  lastSignature String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 }
