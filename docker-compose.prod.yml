@@ -15,28 +15,38 @@ services:
       timeout: 5s
       retries: 5
   api:
-    build: .
-    command: sh -c "npm run db:migrate && npm run dev:api"
+    build:
+      context: .
+      target: runner
+    command: sh -c "npm run db:migrate && node api/dist/server.js"
     env_file:
       - api/.env.example
     environment:
       DATABASE_URL: postgresql://cloaklink:cloaklink@postgres:5432/cloaklink?schema=public
+      NODE_ENV: production
     depends_on:
       postgres:
         condition: service_healthy
   indexer:
-    build: .
-    command: sh -c "npm run db:migrate && npm run dev:indexer"
+    build:
+      context: .
+      target: runner
+    command: sh -c "npm run db:migrate && node indexer/dist/index.js"
     env_file:
       - indexer/.env.example
     environment:
       DATABASE_URL: postgresql://cloaklink:cloaklink@postgres:5432/cloaklink?schema=public
+      NODE_ENV: production
     depends_on:
       postgres:
         condition: service_healthy
+    ports:
+      - '5001:5001'
   frontend:
-    build: .
-    command: npm run dev:frontend
+    build:
+      context: .
+      target: runner
+    command: npm --workspace frontend run start
     environment:
       - NEXT_PUBLIC_API_URL=http://api:4000
     depends_on:

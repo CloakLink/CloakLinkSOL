@@ -52,6 +52,15 @@ CloakLink is an open-source, privacy-minded payment link generator for crypto. C
   npm run dev
   ```
 
+## Observability and operations
+- Structured logging uses Pino across services with request IDs injected on the API; development pretty-printing is automatic.
+- Prometheus metrics are exposed at `GET /metrics` on the API (port 4000) and from the indexer health server on port 5001.
+- Default process metrics (GC, event loop lag, memory) are exported automatically by both services.
+
+## Environment validation and shutdown
+- API and indexer validate critical environment variables (e.g., `DATABASE_URL`, RPC endpoints, pool limits, and ports) on startup via Zod and exit fast when misconfigured.
+- Both services trap `SIGINT`/`SIGTERM` to stop HTTP listeners and pollers cleanly, disconnect Prisma clients, and flush logs before exiting.
+
 ## Solana payment flow and indexer runbook
 - Invoices inherit the profile receive address and target chain (Solana) and optionally an SPL mint address.
 - The indexer polls RPC using `getSignaturesForAddress` and `getParsedTransaction`, validates memo prefixes when enabled, and checks lamport/token balance deltas to detect payments.

@@ -7,6 +7,7 @@
     "doc": "docs"
   },
   "scripts": {
+    "build": "npm --workspace api run build && npm --workspace indexer run build && npm --workspace frontend run build",
     "dev:api": "npm --workspace api run dev",
     "dev:frontend": "npm --workspace frontend run dev",
     "dev:indexer": "npm --workspace indexer run dev",

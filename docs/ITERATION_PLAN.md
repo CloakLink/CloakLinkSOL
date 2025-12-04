@@ -1,23 +1,22 @@
-# Iteration Plan
+# Iteration 6 Operational Readiness Plan
 
-## Infrastructure tasks
-- [x] Postgres migration: switch Prisma datasource to PostgreSQL schema definition and regenerate client artifacts.
-- [x] Containerize Postgres: add a Postgres service with persistent volume and healthchecks in docker-compose and wire API/indexer to it.
-- [x] Database migrations workflow: create fresh Prisma migration targeting Postgres and add npm scripts for migrate/deploy in all services.
-- [x] Environment templates: update api/indexer .env.example files and docs to default to Postgres connection strings instead of SQLite paths.
-- [x] Service startup gating: add a wait-for-DB entrypoint to API and indexer images so they block until Postgres is reachable.
-- [x] Prisma connection tuning: expose pool configuration via env vars and set sensible defaults for production.
-- [x] CI pipeline update: ensure tests/lint use Postgres in CI by starting a container, running migrations, and pointing DATABASE_URL accordingly.
-- [x] Operator runbook: document migration/backups/rollbacks for Postgres and indexer cursor resets.
-- [x] Migration/seed CLI: add npm scripts to run migrations and seed demo data with Prisma for operators.
-- [x] Data backup automation: add script or make target to dump/restore Postgres data for local/dev stacks.
-- [x] Circuit breaker: wrap Solana RPC client in a circuit breaker with configurable failure thresholds and cooldown.
-- [x] Adaptive backoff: implement exponential backoff with jitter for RPC retries in indexer runtime and API client utilities.
-- [x] RPC endpoint failover: allow configuring multiple RPC URLs and rotate through them on failure with logging.
-- [x] Metadata caching: cache token/mint metadata and account info to cut RPC load with TTL invalidation.
-- [x] Indexer health endpoint: expose HTTP health/metrics for indexer (cursor lag, RPC status, breaker state).
-- [x] Structured RPC logging: centralize RPC error logging with request/response metadata for observability.
-- [x] Circuit breaker tests: add unit tests covering breaker transitions, backoff, and endpoint rotation.
-- [x] Indexer health tests: add tests for health endpoint responses and metadata cache behavior.
-- [x] Postgres integration tests: add minimal API/indexer integration test using Postgres (via docker or testcontainer) to validate migrations.
-- [x] Compose override for prod-like deploy: add docker-compose.prod.yml that runs migrations on boot and wires services to Postgres with stricter settings.
+- [x] Establish structured API logging: replace morgan with pino-http, propagate x-request-id, and standardize serializers/levels.
+- [x] Create shared logger utility for API modules using pino base instance with environment-driven level and pretty dev mode.
+- [x] Replace indexer console logger with pino, include log level config, bindings (service/component), and error serialization.
+- [x] Add request lifecycle context in API (per-request child logger) and update route handlers to use structured logs for errors/events.
+- [x] Implement API metrics with prom-client: HTTP duration histogram, request counters, and expose /metrics with auth-free access.
+- [x] Instrument indexer metrics: RPC call counters/histograms and expose HTTP /metrics endpoint alongside health.
+- [x] Integrate process-level metrics (GC, event loop lag) into API and indexer exporters using prom-client defaults.
+- [x] Add API security headers with helmet and document CSP/cross-origin defaults.
+- [x] Enforce strict environment validation in API startup (Port, DATABASE_URL, RPC URLs, default profile/env secrets) using Zod.
+- [x] Enforce strict environment validation for indexer runtime (DB URL, RPC URLs, polling intervals, memo toggle) with Zod.
+- [x] Implement graceful shutdown in API: handle SIGTERM/SIGINT, stop server, flush logger, and close Prisma connections.
+- [x] Implement graceful shutdown in indexer: trap signals, stop HTTP server/poller, flush logger, and disconnect Prisma.
+- [x] Refactor Dockerfile to multi-stage build with production install, pruning dev deps, and copying built artifacts.
+- [x] Add non-root runtime user to Docker image, fix ownership/permissions, and ensure services run as node user.
+- [x] Update docker-compose files to use hardened image/build args, expose metrics ports, and drop privileged settings if any.
+- [x] Add README/docs updates explaining logging/metrics endpoints, new env requirements, and shutdown expectations.
+- [x] Update npm scripts/workspace configs for lint/test/check with new logging/metrics dependencies (e.g., build steps).
+- [x] Add API middleware for correlation id propagation to downstream logs/metrics (fallback to generated UUID).
+- [x] Remove dead/unstructured logging code (morgan tokens, old indexer logger) and ensure Pino prettifier only in dev.
+- [x] Validate new Docker pipeline by building api service via docker compose build and fixing any runtime build issues. (Docker CLI unavailable in sandbox; build attempted.)

@@ -1,38 +1,80 @@
 import 'dotenv/config';
+import http from 'node:http';
+import type { Signals } from 'node:process';
 import express from 'express';
 import cors from 'cors';
-import morgan from 'morgan';
+import helmet from 'helmet';
+import { stdSerializers, type Logger } from 'pino';
+import pinoHttp from 'pino-http';
 import { prisma } from './prisma.js';
 import { Prisma } from '@prisma/client';
 import { nanoid } from 'nanoid';
 import { z } from 'zod';
 import { randomUUID } from 'crypto';
 import { PublicKey } from '@solana/web3.js';
+import { logger } from './logger.js';
+import { metricsMiddleware, registry } from './metrics.js';
+import { config } from './config.js';
 
 const app = express();
 app.use(express.json());
 app.use(
+  helmet({
+    contentSecurityPolicy: false,
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+  })
+);
+app.use(
   cors({
-    origin: process.env.ALLOW_ORIGIN?.split(',') ?? '*',
+    origin: config.allowOrigin?.split(',') ?? '*',
     methods: ['GET', 'POST'],
   })
 );
 
-type RequestWithId = express.Request & { requestId?: string };
-
-const requestIdMiddleware: express.RequestHandler = (req, res, next) => {
-  const requestId = (req.headers['x-request-id'] as string | undefined) ?? randomUUID();
-  (req as RequestWithId).requestId = requestId;
+app.use(
+  pinoHttp({
+    logger,
+    genReqId: (req, res) => {
+      const existingId = req.headers['x-request-id'] as string | undefined;
+      const requestId = existingId ?? randomUUID();
+      res.setHeader('x-request-id', requestId);
+      return requestId;
+    },
+    customLogLevel: (res, err) => {
+      if (err || res.statusCode >= 500) return 'error';
+      if (res.statusCode >= 400) return 'warn';
+      return 'info';
+    },
+    serializers: {
+      err: stdSerializers.err,
+    },
+  })
+);
+app.use((req, res, next) => {
+  const reqWithLogger = req as RequestWithLogger;
+  const requestId = reqWithLogger.id ?? (req.headers['x-request-id'] as string | undefined) ?? randomUUID();
+  reqWithLogger.id = requestId;
   res.setHeader('x-request-id', requestId);
+  if (reqWithLogger.log) {
+    reqWithLogger.log = reqWithLogger.log.child({ requestId });
+  }
   next();
-};
+});
+app.use(metricsMiddleware);
 
-morgan.token('id', (req) => (req as RequestWithId).requestId ?? '');
+const port = config.port;
 
-app.use(requestIdMiddleware);
-app.use(morgan(':method :url :status :response-time ms - :res[content-length] :id'));
+type RequestWithLogger = express.Request & { log?: Logger; id?: string };
 
-const port = process.env.PORT ? Number(process.env.PORT) : 4000;
+function getRequestLogger(req: express.Request): Logger {
+  const reqWithLogger = req as RequestWithLogger;
+  if (reqWithLogger.log) return reqWithLogger.log;
+  if (reqWithLogger.id) return logger.child({ requestId: reqWithLogger.id });
+  return logger;
+}
+
+let server: http.Server | null = null;
+let shuttingDown = false;
 
 function isValidSolanaAddress(address: string) {
   try {
@@ -82,14 +124,13 @@ function slugify(text: string) {
 }
 
 async function ensureDefaultProfile() {
-  const alias = process.env.DEFAULT_PROFILE_ALIAS ?? 'Demo Alias';
-  const receiveAddress =
-    process.env.DEFAULT_RECEIVE_ADDRESS ?? 'H3UuEhEDuJeayQM2ngiZX6hgqPdh9vywgqbiZ9erjRzG';
-  const defaultChain = process.env.DEFAULT_CHAIN ?? 'solana';
+  const alias = config.defaultProfileAlias;
+  const receiveAddress = config.defaultReceiveAddress;
+  const defaultChain = config.defaultChain;
   const existing = await prisma.profile.findFirst({ where: { alias } });
   if (!existing) {
     await prisma.profile.create({ data: { alias, receiveAddress, defaultChain } });
-    console.log(`Seeded default profile for alias ${alias}`);
+    logger.info({ alias }, 'Seeded default profile');
   }
 }
 
@@ -105,16 +146,23 @@ app.get('/health', (_req, res) => {
   res.json({ status: 'ok' });
 });
 
+app.get('/metrics', async (_req, res) => {
+  res.setHeader('Content-Type', registry.contentType);
+  res.end(await registry.metrics());
+});
+
 app.post('/profiles', async (req, res) => {
+  const reqLogger = getRequestLogger(req);
   const parsed = profileSchema.safeParse(req.body);
   if (!parsed.success) {
     return sendError(res, 400, 'Invalid profile payload', parsed.error.flatten());
   }
   try {
     const profile = await prisma.profile.create({ data: parsed.data });
+    reqLogger.info({ profileId: profile.id }, 'Profile created');
     res.status(201).json(profile);
   } catch (err) {
-    console.error(err);
+    reqLogger.error({ err }, 'Failed to create profile');
     res.status(500).json({ error: { message: 'Failed to create profile' } });
   }
 });
@@ -131,6 +179,7 @@ app.get('/profiles', async (_req, res) => {
 });
 
 app.post('/profiles/:id/invoices', async (req, res) => {
+  const reqLogger = getRequestLogger(req);
   const parsed = invoiceSchema.safeParse(req.body);
   if (!parsed.success) {
     return sendError(res, 400, 'Invalid invoice payload', parsed.error.flatten());
@@ -158,9 +207,10 @@ app.post('/profiles/:id/invoices', async (req, res) => {
         expiresAt,
       },
     });
+    reqLogger.info({ profileId: profile.id, invoiceId: invoice.id }, 'Invoice created');
     res.status(201).json(invoice);
   } catch (err) {
-    console.error(err);
+    reqLogger.error({ err, profileId: profile.id }, 'Failed to create invoice');
     if (isUniqueConstraintError(err)) {
       return sendError(res, 409, 'Slug already exists. Provide a unique slug.');
     }
@@ -216,16 +266,47 @@ app.get('/invoices/slug/:slug/status', async (req, res) => {
 
 async function main() {
   await ensureDefaultProfile();
-  app.listen(port, () => {
-    console.log(`API server listening on http://localhost:${port}`);
+  server = app.listen(port, () => {
+    logger.info({ port }, 'API server listening');
   });
+}
+
+async function shutdown(signal: Signals) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  logger.info({ signal }, 'Received shutdown signal');
+
+  const closeServer = async () =>
+    new Promise<void>((resolve, reject) => {
+      if (!server) return resolve();
+      server.close((err) => {
+        if (err) {
+          reject(err);
+          return;
+        }
+        resolve();
+      });
+    });
+
+  try {
+    await closeServer();
+    await prisma.$disconnect();
+    logger.info('API shutdown complete');
+    process.exit(0);
+  } catch (err) {
+    logger.error({ err }, 'Error during shutdown');
+    process.exit(1);
+  }
 }
 
 if (process.env.NODE_ENV !== 'test') {
   main().catch((err) => {
-    console.error(err);
+    logger.error({ err }, 'API server failed to start');
     process.exit(1);
   });
+
+  process.on('SIGINT', shutdown);
+  process.on('SIGTERM', shutdown);
 }
 
 export { app, ensureDefaultProfile };

@@ -20,6 +20,9 @@ const envSchema = z.object({
   CHAIN: z.string().default('solana'),
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
   HEALTH_PORT: z.coerce.number().int().min(1024).max(65535).default(5001),
+  DATABASE_URL: z.string().url(),
+  DATABASE_POOL_MAX: z.coerce.number().int().min(1).default(10),
+  DATABASE_POOL_TIMEOUT_MS: z.coerce.number().int().min(1000).default(5000),
 });
 
 export type IndexerConfig = {
@@ -39,6 +42,9 @@ export type IndexerConfig = {
   logLevel: LogLevel;
   rpcEndpoints: string[];
   healthPort: number;
+  databaseUrl: string;
+  dbPoolMax: number;
+  dbPoolTimeoutMs: number;
 };
 
 export function loadConfig(): IndexerConfig {
@@ -59,6 +65,9 @@ export function loadConfig(): IndexerConfig {
     CHAIN: process.env.CHAIN,
     LOG_LEVEL: process.env.LOG_LEVEL,
     HEALTH_PORT: process.env.HEALTH_PORT,
+    DATABASE_URL: process.env.DATABASE_URL,
+    DATABASE_POOL_MAX: process.env.DATABASE_POOL_MAX,
+    DATABASE_POOL_TIMEOUT_MS: process.env.DATABASE_POOL_TIMEOUT_MS,
   });
 
   if (!parsed.success) {
@@ -89,5 +98,8 @@ export function loadConfig(): IndexerConfig {
     chain: data.CHAIN,
     logLevel: data.LOG_LEVEL,
     healthPort: data.HEALTH_PORT,
+    databaseUrl: data.DATABASE_URL,
+    dbPoolMax: data.DATABASE_POOL_MAX,
+    dbPoolTimeoutMs: data.DATABASE_POOL_TIMEOUT_MS,
   };
 }

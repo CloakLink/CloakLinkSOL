@@ -1,14 +1,12 @@
 import { PrismaClient } from '@prisma/client';
+import { loadConfig } from './config.js';
 
-const defaultPoolLimit = process.env.DATABASE_POOL_MAX ?? '10';
-const defaultPoolTimeout = process.env.DATABASE_POOL_TIMEOUT_MS ?? '5000';
+const config = loadConfig();
+const defaultPoolLimit = String(config.dbPoolMax);
+const defaultPoolTimeout = String(config.dbPoolTimeoutMs);
 
 export function createPrismaClient(): PrismaClient {
-  const databaseUrl = process.env.DATABASE_URL;
-
-  if (!databaseUrl) {
-    throw new Error('DATABASE_URL is not set');
-  }
+  const databaseUrl = config.databaseUrl;
 
   return new PrismaClient({
     datasources: { db: { url: buildDatabaseUrl(databaseUrl) } },
