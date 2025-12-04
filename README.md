@@ -1,11 +1,11 @@
 # CloakLink
 
-CloakLink is an open-source, privacy-minded payment link generator for crypto. Create invoices that hide your main wallet while staying non-custodial. The Simple Mode MVP routes all invoices for a profile to a dedicated receive address.
+CloakLink is an open-source, privacy-minded payment link generator for crypto. Create invoices that hide your main wallet while staying non-custodial. The Simple Mode MVP routes all invoices for a profile to a dedicated receive address on Solana.
 
 ## Packages
-- `api`: Express + Prisma API with SQLite storage for profiles and invoices.
+- `api`: Express + Prisma API with SQLite storage for profiles and invoices (Solana address validation built-in).
 - `frontend`: Next.js + Tailwind dashboard and public invoice pages.
-- `indexer`: Polling script that marks invoices paid (stubbed to react to txHash for now) and is ready for RPC checks.
+- `indexer`: Solana polling script using `@solana/web3.js` to mark invoices paid when SOL or SPL token transfers land at the receive address.
 
 ## Prerequisites
 - Node.js 20+
@@ -19,7 +19,7 @@ CloakLink is an open-source, privacy-minded payment link generator for crypto. C
 2. Prepare environment variables (examples are checked in):
    - API: copy `api/.env.example` to `api/.env` and adjust `DATABASE_URL`, `PORT`, and default profile fields.
    - Frontend: copy `frontend/.env.local.example` to `frontend/.env.local` and set `NEXT_PUBLIC_API_URL` (defaults to `http://localhost:4000`).
-   - Indexer: copy `indexer/.env.example` to `indexer/.env` and set `DATABASE_URL` (point to the same SQLite file) and `RPC_URL`.
+   - Indexer: copy `indexer/.env.example` to `indexer/.env` and set `DATABASE_URL` (point to the same SQLite file) and `RPC_URL` (defaults to `https://api.mainnet-beta.solana.com`).
 3. Run database migration and generate Prisma client (the default `.env` paths expect the SQLite DB under `./data`):
    ```bash
    cd api
@@ -42,7 +42,7 @@ CloakLink is an open-source, privacy-minded payment link generator for crypto. C
   ```
   Open http://localhost:3000 for the landing page and dashboard.
 
-- **Indexer** (stubbed RPC checker that marks invoices paid when a `txHash` is present)
+- **Indexer** (Solana RPC poller for SOL + SPL payments)
   ```bash
   cd indexer
   npm run dev
