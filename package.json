@@ -19,7 +19,12 @@
     "test:api": "npm --workspace api run test",
     "test:indexer": "npm --workspace indexer run test",
     "test": "npm run test:api && npm run test:indexer",
-    "check": "npm run lint && npm run test"
+    "check": "npm run lint && npm run test",
+    "db:migrate": "prisma migrate deploy --schema api/prisma/schema.prisma",
+    "db:migrate:dev": "prisma migrate dev --create-only --schema api/prisma/schema.prisma",
+    "db:generate": "prisma generate --schema api/prisma/schema.prisma",
+    "db:reset": "prisma migrate reset --force --schema api/prisma/schema.prisma",
+    "db:seed": "npm --workspace api run db:seed"
   },
   "keywords": [],
   "author": "",

@@ -8,8 +8,11 @@
     "build": "tsc -p tsconfig.json",
     "dev": "ts-node-dev --respawn --transpile-only --esm src/server.ts",
     "prisma": "prisma",
-    "migrate": "prisma migrate dev --name init",
+    "migrate": "prisma migrate deploy --schema prisma/schema.prisma",
+    "migrate:dev": "prisma migrate dev --create-only --schema prisma/schema.prisma",
+    "db:reset": "prisma migrate reset --force --schema prisma/schema.prisma",
     "generate": "prisma generate",
+    "db:seed": "prisma db seed --schema prisma/schema.prisma",
     "lint": "eslint \"src/**/*.{ts,tsx}\"",
     "pretest": "npm run generate",
     "test": "vitest run"
@@ -18,6 +21,9 @@
   "author": "",
   "license": "ISC",
   "type": "module",
+  "prisma": {
+    "seed": "ts-node --esm prisma/seed.ts"
+  },
   "dependencies": {
     "@prisma/client": "^5.22.0",
     "@solana/web3.js": "^1.95.2",

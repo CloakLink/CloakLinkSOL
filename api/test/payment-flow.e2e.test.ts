@@ -1,10 +1,10 @@
 import { spawnSync } from 'node:child_process';
-import fs from 'node:fs';
 import path from 'node:path';
 import request from 'supertest';
 import { PrismaClient } from '@prisma/client';
 import { PublicKey } from '@solana/web3.js';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { type RpcClient } from '../../indexer/src/rpcClient.js';
 import { createIndexerRuntime } from '../../indexer/src/runtime.js';
 import { createLogger } from '../../indexer/src/logger.js';
 import { type IndexerConfig } from '../../indexer/src/config.js';
@@ -12,8 +12,8 @@ import { type IndexerConfig } from '../../indexer/src/config.js';
 const __dirname = path.dirname(new URL(import.meta.url).pathname);
 const apiRoot = path.resolve(__dirname, '..');
 const repoRoot = path.resolve(apiRoot, '..');
-const dataDir = path.join(repoRoot, 'data');
-const dbUrl = `file:${path.join(dataDir, 'e2e.db')}`;
+const dbUrl =
+  process.env.TEST_DATABASE_URL ?? 'postgresql://cloaklink:cloaklink@localhost:5432/cloaklink_e2e?schema=public';
 const receiveAddress = new PublicKey('H3UuEhEDuJeayQM2ngiZX6hgqPdh9vywgqbiZ9erjRzG').toBase58();
 const baseConfig: IndexerConfig = {
   rpcUrl: 'http://localhost:8899',
@@ -27,12 +27,11 @@ const baseConfig: IndexerConfig = {
   logLevel: 'error',
 };
 
-let prisma: PrismaClient;
-let app: import('express').Express;
+let prisma: PrismaClient | undefined;
+let app: import('express').Express | undefined;
 let skipReason: string | null = null;
 
 beforeAll(async () => {
-  fs.mkdirSync(dataDir, { recursive: true });
   process.env.DATABASE_URL = dbUrl;
   const prismaBin = path.join(repoRoot, 'node_modules', '.bin', 'prisma');
   try {
@@ -51,8 +50,8 @@ beforeAll(async () => {
     ({ prisma } = await import('../src/prisma.js'));
     ({ app } = await import('../src/server.js'));
 
-    await prisma.invoice.deleteMany();
-    await prisma.profile.deleteMany();
+    await prisma!.invoice.deleteMany();
+    await prisma!.profile.deleteMany();
   } catch (err) {
     skipReason = `Prisma setup failed: ${err instanceof Error ? err.message : String(err)}`;
   }
@@ -77,7 +76,7 @@ describe('End-to-end invoice payment detection', () => {
 
     const invoice = invoiceRes.body;
 
-    const connection = {
+    const rpcClient: Pick<RpcClient, 'getSignaturesForAddress' | 'getParsedTransaction' | 'status'> = {
       getSignaturesForAddress: vi.fn().mockResolvedValue([
         { signature: 'sig-e2e', slot: 1, err: null, blockTime: 1_700_000_000 },
       ]),
@@ -85,10 +84,15 @@ describe('End-to-end invoice payment detection', () => {
         transaction: { message: { accountKeys: [new PublicKey(receiveAddress)], instructions: [] } },
         meta: { preBalances: [0], postBalances: [2_000_000_000], logMessages: [] },
       }),
+      status: vi.fn().mockReturnValue({
+        endpoint: 'test-endpoint',
+        state: 'closed',
+        failureCount: 0,
+      }),
     };
 
     const runtime = createIndexerRuntime({
-      connection: connection as any,
+      rpcClient: rpcClient as any,
       prisma: prisma as any,
       config: baseConfig,
       logger: createLogger('error'),

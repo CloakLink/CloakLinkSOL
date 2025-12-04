@@ -2,9 +2,9 @@
 
 ## Components
 - **Frontend (Next.js)**: Landing page, dashboard, invoice creation, and public invoice view. Talks to API via `NEXT_PUBLIC_API_URL`.
-- **API (Express + Prisma)**: Manages profiles and invoices in SQLite. Seeds a default profile on startup and exposes REST endpoints.
+- **API (Express + Prisma)**: Manages profiles and invoices in Postgres. Seeds a default profile on startup and exposes REST endpoints.
 - **Indexer (Node script)**: Polls invoices and updates status. Currently marks invoices paid when a `txHash` is present, leaving room for future on-chain checks.
-- **Database (SQLite via Prisma)**: Simple file-based database for local development.
+- **Database (PostgreSQL via Prisma)**: Durable relational store for profiles, invoices, and indexer cursors.
 
 ## Data models
 - **Profile**: `id`, `alias`, `receiveAddress`, `defaultChain`, timestamps.

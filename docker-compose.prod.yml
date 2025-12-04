@@ -7,8 +7,6 @@ services:
       POSTGRES_USER: cloaklink
       POSTGRES_PASSWORD: cloaklink
       POSTGRES_DB: cloaklink
-    ports:
-      - '5432:5432'
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
@@ -18,15 +16,21 @@ services:
       retries: 5
   api:
     build: .
-    command: sh -c "node scripts/wait-for-db.js && npm run dev:api"
+    command: sh -c "npm run db:migrate && npm run dev:api"
     env_file:
       - api/.env.example
     environment:
       DATABASE_URL: postgresql://cloaklink:cloaklink@postgres:5432/cloaklink?schema=public
-    ports:
-      - '4000:4000'
-    volumes:
-      - .:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+  indexer:
+    build: .
+    command: sh -c "npm run db:migrate && npm run dev:indexer"
+    env_file:
+      - indexer/.env.example
+    environment:
+      DATABASE_URL: postgresql://cloaklink:cloaklink@postgres:5432/cloaklink?schema=public
     depends_on:
       postgres:
         condition: service_healthy
@@ -34,25 +38,8 @@ services:
     build: .
     command: npm run dev:frontend
     environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:4000
-    ports:
-      - '3000:3000'
-    volumes:
-      - .:/app
+      - NEXT_PUBLIC_API_URL=http://api:4000
     depends_on:
       - api
-  indexer:
-    build: .
-    command: sh -c "node scripts/wait-for-db.js && npm run dev:indexer"
-    env_file:
-      - indexer/.env.example
-    depends_on:
-      - api
-      postgres:
-        condition: service_healthy
-    volumes:
-      - .:/app
-    environment:
-      DATABASE_URL: postgresql://cloaklink:cloaklink@postgres:5432/cloaklink?schema=public
 volumes:
   postgres-data:

@@ -6,6 +6,9 @@
   "scripts": {
     "start": "ts-node --esm src/index.ts",
     "dev": "ts-node --esm src/index.ts",
+    "migrate": "prisma migrate deploy --schema ../api/prisma/schema.prisma",
+    "migrate:dev": "prisma migrate dev --create-only --schema ../api/prisma/schema.prisma",
+    "generate": "prisma generate --schema ../api/prisma/schema.prisma",
     "lint": "eslint \"src/**/*.{ts,tsx}\"",
     "test": "vitest run"
   },

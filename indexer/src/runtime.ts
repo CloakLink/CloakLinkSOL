@@ -1,12 +1,13 @@
 import { Prisma, type PrismaClient, type IndexerCursor, type Invoice } from '@prisma/client';
-import { Connection, LAMPORTS_PER_SOL, PublicKey, type ParsedTransactionWithMeta } from '@solana/web3.js';
+import { LAMPORTS_PER_SOL, PublicKey, type ParsedTransactionWithMeta } from '@solana/web3.js';
 import { type IndexerConfig } from './config.js';
 import { type createLogger } from './logger.js';
+import { RpcClient } from './rpcClient.js';
 
 type Logger = ReturnType<typeof createLogger>;
 
 export type IndexerDependencies = {
-  connection: Pick<Connection, 'getSignaturesForAddress' | 'getParsedTransaction'>;
+  rpcClient: Pick<RpcClient, 'getSignaturesForAddress' | 'getParsedTransaction' | 'status'>;
   prisma: Pick<PrismaClient, 'invoice' | 'indexerCursor'>;
   config: IndexerConfig;
   logger: Logger;
@@ -17,10 +18,6 @@ function toErrorContext(err: unknown) {
     return { message: err.message, stack: err.stack };
   }
   return { message: String(err) };
-}
-
-async function sleep(ms: number) {
-  await new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function findAccountIndex(tx: ParsedTransactionWithMeta, address: string) {
@@ -83,60 +80,10 @@ function getSplIncreases(tx: ParsedTransactionWithMeta, owner: string): TokenInc
 
 type InvoiceWithCursor = Invoice & { cursor: IndexerCursor | null };
 
-export function createIndexerRuntime({ connection, prisma, config, logger }: IndexerDependencies) {
-  let consecutiveRpcFailures = 0;
-
-  async function withTimeout<T>(promise: Promise<T>, actionName: string): Promise<T> {
-    return new Promise<T>((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        reject(new Error(`RPC ${actionName} timed out after ${config.rpcTimeoutMs}ms`));
-      }, config.rpcTimeoutMs);
-
-      promise
-        .then((value) => {
-          clearTimeout(timeout);
-          resolve(value);
-        })
-        .catch((err) => {
-          clearTimeout(timeout);
-          reject(err);
-        });
-    });
-  }
-
-  async function withRpcRetry<T>(actionName: string, operation: () => Promise<T>): Promise<T> {
-    let lastError: unknown;
-    let delay = config.rpcRetryDelayMs;
-
-    for (let attempt = 0; attempt <= config.rpcMaxRetries; attempt++) {
-      try {
-        const result = await withTimeout(operation(), actionName);
-        if (consecutiveRpcFailures > 0) {
-          logger.info(`RPC ${actionName} recovered`, { failures: consecutiveRpcFailures });
-          consecutiveRpcFailures = 0;
-        }
-        return result;
-      } catch (err) {
-        lastError = err;
-        consecutiveRpcFailures += 1;
-        if (attempt === config.rpcMaxRetries) break;
-        if (consecutiveRpcFailures === 1 || consecutiveRpcFailures % 3 === 0) {
-          logger.warn(`RPC ${actionName} failed`, {
-            attempt: attempt + 1,
-            limit: config.rpcMaxRetries + 1,
-            error: toErrorContext(err),
-          });
-        }
-        await sleep(delay);
-        delay = Math.min(delay * 2, 30000);
-      }
-    }
-
-    logger.error(`RPC ${actionName} failed after ${config.rpcMaxRetries + 1} attempt(s)`, {
-      error: toErrorContext(lastError),
-    });
-    throw lastError instanceof Error ? lastError : new Error('Unknown RPC error');
-  }
+export function createIndexerRuntime({ rpcClient, prisma, config, logger }: IndexerDependencies) {
+  let lastPollAt: number | null = null;
+  let lastInvoiceCount = 0;
+  let skippedDueToCircuit = 0;
 
   async function markInvoicePaid(invoiceId: string, signature: string, blockTime?: number | null) {
     await prisma.invoice.update({
@@ -158,9 +105,7 @@ export function createIndexerRuntime({ connection, prisma, config, logger }: Ind
   }
 
   async function processSignature(invoice: InvoiceWithCursor, signature: string) {
-    const tx = await withRpcRetry('getParsedTransaction', () =>
-      connection.getParsedTransaction(signature, { maxSupportedTransactionVersion: 0 })
-    );
+    const tx = await rpcClient.getParsedTransaction(signature, { maxSupportedTransactionVersion: 0 });
     if (!tx) return false;
 
     const expectedMemo = `${config.memoPrefix}${invoice.slug}`;
@@ -188,12 +133,10 @@ export function createIndexerRuntime({ connection, prisma, config, logger }: Ind
     const lastSignature = invoice.cursor?.lastSignature ?? undefined;
     const address = new PublicKey(invoice.receiveAddress);
 
-    const signatures = await withRpcRetry('getSignaturesForAddress', () =>
-      connection.getSignaturesForAddress(address, {
-        limit: 20,
-        until: lastSignature,
-      })
-    );
+    const signatures = await rpcClient.getSignaturesForAddress(address, {
+      limit: 20,
+      until: lastSignature,
+    });
 
     if (signatures.length === 0) {
       return;
@@ -214,10 +157,23 @@ export function createIndexerRuntime({ connection, prisma, config, logger }: Ind
   }
 
   async function pollOnce() {
+    const status = rpcClient.status();
+    if (status.state === 'open' && status.openUntil && status.openUntil > Date.now()) {
+      logger.warn('RPC circuit open; skipping poll cycle', {
+        endpoint: status.endpoint,
+        openUntil: status.openUntil,
+        failureCount: status.failureCount,
+      });
+      skippedDueToCircuit += 1;
+      lastPollAt = Date.now();
+      return;
+    }
+
     const unpaid = await prisma.invoice.findMany({
       where: { status: { not: 'PAID' }, chain: config.chain },
       include: { cursor: true },
     });
+    lastInvoiceCount = unpaid.length;
     for (const invoice of unpaid) {
       try {
         await checkInvoice(invoice as InvoiceWithCursor);
@@ -225,6 +181,7 @@ export function createIndexerRuntime({ connection, prisma, config, logger }: Ind
         logger.error('Error processing invoice', { invoiceId: invoice.id, error: toErrorContext(err) });
       }
     }
+    lastPollAt = Date.now();
   }
 
   async function start() {
@@ -246,7 +203,13 @@ export function createIndexerRuntime({ connection, prisma, config, logger }: Ind
     getSolIncrease,
     getSplIncreases,
     extractMemos,
-    withRpcRetry,
+    rpcStatus: () => rpcClient.status(),
+    healthSnapshot: () => ({
+      lastPollAt,
+      lastInvoiceCount,
+      skippedDueToCircuit,
+      rpc: rpcClient.status(),
+    }),
   };
 }
 
