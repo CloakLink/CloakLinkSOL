@@ -37,7 +37,7 @@ const port = process.env.PORT ? Number(process.env.PORT) : 4000;
 function isValidSolanaAddress(address: string) {
   try {
     return new PublicKey(address).toBase58() === address;
-  } catch (err) {
+  } catch {
     return false;
   }
 }
@@ -95,6 +95,10 @@ async function ensureDefaultProfile() {
 
 function sendError(res: express.Response, status: number, message: string, details?: unknown) {
   return res.status(status).json({ error: { message, details } });
+}
+
+function isUniqueConstraintError(err: unknown): err is { code: string } {
+  return Boolean(err && typeof err === 'object' && 'code' in err && (err as { code?: string }).code === 'P2002');
 }
 
 app.get('/health', (_req, res) => {
@@ -157,7 +161,7 @@ app.post('/profiles/:id/invoices', async (req, res) => {
     res.status(201).json(invoice);
   } catch (err) {
     console.error(err);
-    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+    if (isUniqueConstraintError(err)) {
       return sendError(res, 409, 'Slug already exists. Provide a unique slug.');
     }
     res.status(500).json({ error: { message: 'Failed to create invoice' } });
