@@ -1,6 +1,7 @@
 import { Connection, PublicKey, type ParsedTransactionWithMeta } from '@solana/web3.js';
 import { type IndexerConfig } from './config.js';
 import { type createLogger } from './logger.js';
+import { rpcRequestDuration, rpcRequestsTotal } from './metrics.js';
 
 const JITTER_RATIO = 0.1;
 
@@ -63,13 +64,6 @@ export class RpcClient {
   private buildConnection(endpoint: string) {
     this.logger.info('Connecting to Solana RPC', { endpoint });
     this.connection = this.connectionFactory(endpoint);
-  }
-
-  private toErrorContext(error: unknown) {
-    if (error instanceof Error) {
-      return { message: error.message, stack: error.stack };
-    }
-    return { message: String(error) };
   }
 
   private get currentEndpoint() {
@@ -143,20 +137,26 @@ export class RpcClient {
     let lastError: unknown;
 
     for (let attempt = 0; attempt <= this.config.rpcMaxRetries; attempt++) {
+      const endpoint = this.currentEndpoint;
+      const endTimer = rpcRequestDuration.startTimer({ method: actionName, endpoint });
       try {
         const result = await withTimeout(operation(this.connection), this.config.rpcTimeoutMs, actionName);
         this.markSuccess();
+        rpcRequestsTotal.inc({ method: actionName, endpoint, outcome: 'success' });
+        endTimer({ outcome: 'success' });
         return result;
       } catch (err) {
         lastError = err;
         this.markFailure(err);
+        rpcRequestsTotal.inc({ method: actionName, endpoint, outcome: 'error' });
+        endTimer({ outcome: 'error' });
         if (attempt === this.config.rpcMaxRetries) break;
-        this.logger.warn('RPC call failed', {
+        this.logger.warn({
+          err,
           action: actionName,
           endpoint: this.currentEndpoint,
           attempt: attempt + 1,
-          error: this.toErrorContext(err),
-        });
+        }, 'RPC call failed');
         if (this.shouldRotateEndpoint()) {
           this.rotateEndpoint();
         }

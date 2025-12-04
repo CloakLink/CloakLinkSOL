@@ -13,13 +13,6 @@ export type IndexerDependencies = {
   logger: Logger;
 };
 
-function toErrorContext(err: unknown) {
-  if (err instanceof Error) {
-    return { message: err.message, stack: err.stack };
-  }
-  return { message: String(err) };
-}
-
 function findAccountIndex(tx: ParsedTransactionWithMeta, address: string) {
   return tx.transaction.message.accountKeys.findIndex((key) =>
     'pubkey' in key ? key.pubkey.toBase58() === address : key.toBase58() === address
@@ -178,7 +171,7 @@ export function createIndexerRuntime({ rpcClient, prisma, config, logger }: Inde
       try {
         await checkInvoice(invoice as InvoiceWithCursor);
       } catch (err) {
-        logger.error('Error processing invoice', { invoiceId: invoice.id, error: toErrorContext(err) });
+        logger.error({ err, invoiceId: invoice.id }, 'Error processing invoice');
       }
     }
     lastPollAt = Date.now();
@@ -188,7 +181,7 @@ export function createIndexerRuntime({ rpcClient, prisma, config, logger }: Inde
     logger.info('Indexer starting', { rpcUrl: config.rpcUrl, pollIntervalMs: config.pollIntervalMs });
     await pollOnce();
     const interval = setInterval(() => {
-      pollOnce().catch((err) => logger.error('Polling error', { error: toErrorContext(err) }));
+      pollOnce().catch((err) => logger.error({ err }, 'Polling error'));
     }, config.pollIntervalMs);
     return () => clearInterval(interval);
   }

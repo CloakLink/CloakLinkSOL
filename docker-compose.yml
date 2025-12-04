@@ -17,42 +17,46 @@ services:
       timeout: 5s
       retries: 5
   api:
-    build: .
-    command: sh -c "node scripts/wait-for-db.js && npm run dev:api"
+    build:
+      context: .
+      target: runner
+    command: sh -c "node scripts/wait-for-db.js && node api/dist/server.js"
     env_file:
       - api/.env.example
     environment:
       DATABASE_URL: postgresql://cloaklink:cloaklink@postgres:5432/cloaklink?schema=public
+      NODE_ENV: production
     ports:
       - '4000:4000'
-    volumes:
-      - .:/app
     depends_on:
       postgres:
         condition: service_healthy
   frontend:
-    build: .
-    command: npm run dev:frontend
+    build:
+      context: .
+      target: runner
+    command: npm --workspace frontend run start
     environment:
       - NEXT_PUBLIC_API_URL=http://localhost:4000
     ports:
       - '3000:3000'
-    volumes:
-      - .:/app
     depends_on:
       - api
   indexer:
-    build: .
-    command: sh -c "node scripts/wait-for-db.js && npm run dev:indexer"
+    build:
+      context: .
+      target: runner
+    command: sh -c "node scripts/wait-for-db.js && node indexer/dist/index.js"
     env_file:
       - indexer/.env.example
     depends_on:
       - api
       postgres:
         condition: service_healthy
-    volumes:
-      - .:/app
     environment:
       DATABASE_URL: postgresql://cloaklink:cloaklink@postgres:5432/cloaklink?schema=public
+      NODE_ENV: production
+    ports:
+      - '5001:5001'
 volumes:
   postgres-data:

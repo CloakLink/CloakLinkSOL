@@ -1,48 +1,28 @@
-import { LogLevel } from './config';
+import pino from 'pino';
+import { type LogLevel } from './config.js';
 
-type LogEntry = {
-  level: LogLevel;
-  message: string;
-  timestamp: string;
-  context?: Record<string, unknown>;
-};
+const transport =
+  process.env.NODE_ENV === 'production'
+    ? undefined
+    : {
+        target: 'pino-pretty',
+        options: {
+          colorize: true,
+          translateTime: 'SYS:standard',
+          singleLine: true,
+        },
+      };
 
-const levelPriority: Record<LogLevel, number> = {
-  debug: 10,
-  info: 20,
-  warn: 30,
-  error: 40,
-};
+export function createLogger(minLevel: LogLevel, bindings?: Record<string, string>) {
+  const logger = pino({
+    level: process.env.LOG_LEVEL ?? minLevel,
+    base: { service: 'indexer', ...(bindings ?? {}) },
+    redact: ['password', 'secret', 'token'],
+    serializers: {
+      err: pino.stdSerializers.err,
+    },
+    ...(transport ? { transport } : {}),
+  });
 
-function write(entry: LogEntry) {
-  const payload = JSON.stringify(entry);
-  if (entry.level === 'error') {
-    console.error(payload);
-  } else if (entry.level === 'warn') {
-    console.warn(payload);
-  } else {
-    console.log(payload);
-  }
-}
-
-export function createLogger(minLevel: LogLevel) {
-  const minLevelScore = levelPriority[minLevel];
-
-  const log = (level: LogLevel, message: string, context?: Record<string, unknown>) => {
-    if (levelPriority[level] < minLevelScore) return;
-    const entry: LogEntry = {
-      level,
-      message,
-      timestamp: new Date().toISOString(),
-      ...(context ? { context } : {}),
-    };
-    write(entry);
-  };
-
-  return {
-    debug: (message: string, context?: Record<string, unknown>) => log('debug', message, context),
-    info: (message: string, context?: Record<string, unknown>) => log('info', message, context),
-    warn: (message: string, context?: Record<string, unknown>) => log('warn', message, context),
-    error: (message: string, context?: Record<string, unknown>) => log('error', message, context),
-  };
+  return logger;
 }
