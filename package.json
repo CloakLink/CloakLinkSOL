@@ -15,7 +15,11 @@
     "lint:frontend": "npm --workspace frontend run lint",
     "lint:api": "npm --workspace api run lint",
     "lint:indexer": "npm --workspace indexer run lint",
-    "lint": "npm run lint:frontend && npm run lint:api && npm run lint:indexer"
+    "lint": "npm run lint:frontend && npm run lint:api && npm run lint:indexer",
+    "test:api": "npm --workspace api run test",
+    "test:indexer": "npm --workspace indexer run test",
+    "test": "npm run test:api && npm run test:indexer",
+    "check": "npm run lint && npm run test"
   },
   "keywords": [],
   "author": "",
@@ -28,6 +32,7 @@
     "indexer"
   ],
   "devDependencies": {
-    "concurrently": "^9.2.1"
+    "concurrently": "^9.2.1",
+    "prisma": "5.22.0"
   }
 }

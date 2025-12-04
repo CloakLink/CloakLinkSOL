@@ -11,6 +11,7 @@
     "migrate": "prisma migrate dev --name init",
     "generate": "prisma generate",
     "lint": "eslint \"src/**/*.{ts,tsx}\"",
+    "pretest": "npm run generate",
     "test": "vitest run"
   },
   "keywords": [],
@@ -37,7 +38,7 @@
     "@typescript-eslint/eslint-plugin": "^8.48.1",
     "@typescript-eslint/parser": "^8.48.1",
     "eslint": "^9.39.1",
-    "prisma": "^5.16.1",
+    "prisma": "5.22.0",
     "supertest": "^7.1.4",
     "ts-node": "^10.9.2",
     "ts-node-dev": "^2.0.0",
