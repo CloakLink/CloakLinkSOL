@@ -4,6 +4,7 @@ import request from 'supertest';
 import { PrismaClient } from '@prisma/client';
 import { PublicKey } from '@solana/web3.js';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { type RpcClient } from '../../indexer/src/rpcClient.js';
 import { createIndexerRuntime } from '../../indexer/src/runtime.js';
 import { createLogger } from '../../indexer/src/logger.js';
 import { type IndexerConfig } from '../../indexer/src/config.js';
@@ -75,7 +76,7 @@ describe('End-to-end invoice payment detection', () => {
 
     const invoice = invoiceRes.body;
 
-    const connection = {
+    const rpcClient: Pick<RpcClient, 'getSignaturesForAddress' | 'getParsedTransaction' | 'status'> = {
       getSignaturesForAddress: vi.fn().mockResolvedValue([
         { signature: 'sig-e2e', slot: 1, err: null, blockTime: 1_700_000_000 },
       ]),
@@ -83,10 +84,15 @@ describe('End-to-end invoice payment detection', () => {
         transaction: { message: { accountKeys: [new PublicKey(receiveAddress)], instructions: [] } },
         meta: { preBalances: [0], postBalances: [2_000_000_000], logMessages: [] },
       }),
+      status: vi.fn().mockReturnValue({
+        endpoint: 'test-endpoint',
+        state: 'closed',
+        failureCount: 0,
+      }),
     };
 
     const runtime = createIndexerRuntime({
-      connection: connection as any,
+      rpcClient: rpcClient as any,
       prisma: prisma as any,
       config: baseConfig,
       logger: createLogger('error'),
