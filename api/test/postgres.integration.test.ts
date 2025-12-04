@@ -1,7 +1,6 @@
 import net from 'node:net';
 import { Prisma } from '@prisma/client';
 import { describe, expect, it } from 'vitest';
-import { createPrismaClient } from '../src/prisma.js';
 
 async function canReachPostgres(url: string) {
   const parsed = new URL(url);
@@ -28,12 +27,15 @@ describe('Postgres integration', () => {
   const databaseUrl = process.env.DATABASE_URL ?? 'postgresql://cloaklink:cloaklink@localhost:5432/cloaklink?schema=public';
 
   it('creates and reads invoices when Postgres is available', async () => {
+    process.env.DATABASE_URL = databaseUrl;
+
     const reachable = await canReachPostgres(databaseUrl);
     if (!reachable) {
       console.warn('Postgres not reachable; skipping integration assertion');
       return;
     }
 
+    const { createPrismaClient } = await import('../src/prisma.js');
     const prisma = createPrismaClient();
     await prisma.invoice.deleteMany();
     await prisma.profile.deleteMany();
